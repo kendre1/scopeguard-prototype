@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ScopeGuard — Homeowner Co-Pilot for GC Bids</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              900: '#0c4a6e'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50">
+    <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold text-sm">SG</div>
+        <span class="font-semibold text-lg tracking-tight">ScopeGuard</span>
+      </div>
+      <span class="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">Prototype v0.1</span>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 py-8">
+    <!-- Landing / Entry -->
+    <section id="landing" class="space-y-8">
+      <div class="text-center max-w-2xl mx-auto">
+        <h1 class="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
+          Turn your renovation idea into a defensible budget
+        </h1>
+        <p class="mt-3 text-slate-600 text-lg">
+          Get realistic cost ranges, market-aligned milestones, and negotiation leverage — whether you have drawings or just photos of the space.
+        </p>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+        <!-- Plans Path -->
+        <button onclick="startPath('plans')" class="group text-left bg-white border-2 border-slate-200 hover:border-brand-500 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all">
+          <div class="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center mb-4 group-hover:bg-brand-100">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <h2 class="font-semibold text-lg text-slate-900">I have plans / drawings</h2>
+          <p class="mt-1 text-sm text-slate-500">Higher-confidence estimate from architectural drawings or detailed notes.</p>
+        </button>
+
+        <!-- Photos Path -->
+        <button onclick="startPath('photos')" class="group text-left bg-white border-2 border-slate-200 hover:border-brand-500 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all">
+          <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4 group-hover:bg-emerald-100">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <h2 class="font-semibold text-lg text-slate-900">I have photos + details</h2>
+          <p class="mt-1 text-sm text-slate-500">Planning-level estimate from current-condition photos and a short questionnaire. Most common path.</p>
+        </button>
+      </div>
+
+      <p class="text-center text-sm text-slate-400 max-w-xl mx-auto">
+        This is a prototype. Estimates are illustrative planning ranges only — not formal quotes. Always verify with licensed local contractors.
+      </p>
+    </section>
+
+    <!-- Photos Form -->
+    <section id="photos-form" class="hidden space-y-6">
+      <button onclick="backToLanding()" class="text-sm text-brand-600 hover:text-brand-700 flex items-center gap-1">
+        ← Back
+      </button>
+      <h2 class="text-2xl font-bold text-slate-900">Photos + Details Path</h2>
+      <p class="text-slate-600">Tell us about the space. We’ll generate a planning budget with clear assumptions.</p>
+
+      <form id="photoForm" class="bg-white rounded-2xl border border-slate-200 p-6 space-y-6 shadow-sm" onsubmit="handlePhotoSubmit(event)">
+        <!-- Room Type -->
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">What are you renovating?</label>
+          <select id="roomType" required class="w-full rounded-lg border-slate-300 border px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+            <option value="">Select…</option>
+            <option value="kitchen">Kitchen</option>
+            <option value="bathroom">Bathroom (full)</option>
+            <option value="bathroom_half">Bathroom (half / powder)</option>
+            <option value="basement">Basement finish</option>
+            <option value="addition">Room addition / ADU</option>
+            <option value="whole_house">Whole-house / multi-room</option>
+            <option value="other">Other / multiple rooms</option>
+          </select>
+        </div>
+
+        <!-- Approximate Size -->
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Approx. size (sq ft)</label>
+            <input type="number" id="sqft" min="20" max="5000" placeholder="e.g. 180" required
+              class="w-full rounded-lg border-slate-300 border px-3 py-2 focus:ring-2 focus:ring-brand-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Location (ZIP or City)</label>
+            <input type="text" id="location" placeholder="e.g. 10001 or New York, NY" required
+              class="w-full rounded-lg border-slate-300 border px-3 py-2 focus:ring-2 focus:ring-brand-500" />
+          </div>
+        </div>
+
+        <!-- Finish Level -->
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-2">Target finish level</label>
+          <div class="grid grid-cols-3 gap-3">
+            <label class="cursor-pointer">
+              <input type="radio" name="finish" value="basic" class="peer sr-only" checked />
+              <div class="border-2 border-slate-200 peer-checked:border-brand-500 peer-checked:bg-brand-50 rounded-xl p-3 text-center text-sm">
+                <div class="font-medium">Basic</div>
+                <div class="text-xs text-slate-500 mt-0.5">Stock / value</div>
+              </div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="finish" value="mid" class="peer sr-only" />
+              <div class="border-2 border-slate-200 peer-checked:border-brand-500 peer-checked:bg-brand-50 rounded-xl p-3 text-center text-sm">
+                <div class="font-medium">Mid-range</div>
+                <div class="text-xs text-slate-500 mt-0.5">Semi-custom</div>
+              </div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="finish" value="luxury" class="peer sr-only" />
+              <div class="border-2 border-slate-200 peer-checked:border-brand-500 peer-checked:bg-brand-50 rounded-xl p-3 text-center text-sm">
+                <div class="font-medium">Luxury</div>
+                <div class="text-xs text-slate-500 mt-0.5">Custom / high-end</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Desired Changes -->
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">What do you want to change? (select all that apply)</label>
+          <div class="grid sm:grid-cols-2 gap-2 text-sm">
+            <label class="flex items-center gap-2"><input type="checkbox" name="changes" value="cabinets" class="rounded" /> New cabinets</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="changes" value="counters" class="rounded" /> New countertops</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="changes" value="appliances" class="rounded" /> New appliances</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="changes" value="flooring" class="rounded" /> New flooring</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="changes" value="layout" class="rounded" /> Layout / open wall</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="changes" value="plumbing" class="rounded" /> Move plumbing</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="changes" value="electrical" class="rounded" /> Electrical upgrades</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="changes" value="full_gut" class="rounded" /> Full gut renovation</label>
+          </div>
+        </div>
+
+        <!-- Mock Photo Upload -->
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Photos of current conditions (optional for prototype)</label>
+          <div class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-brand-400 transition-colors">
+            <input type="file" id="photos" accept="image/*" multiple class="hidden" onchange="handlePhotoSelect(event)" />
+            <label for="photos" class="cursor-pointer">
+              <div class="text-slate-500 text-sm">Click to select photos or drag here</div>
+              <div class="text-xs text-slate-400 mt-1">JPG, PNG — multiple allowed</div>
+            </label>
+            <div id="photoPreview" class="mt-3 flex flex-wrap gap-2 justify-center"></div>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Anything else we should know?</label>
+          <textarea id="notes" rows="3" placeholder="e.g. load-bearing wall concerns, HOA rules, timeline, existing issues…"
+            class="w-full rounded-lg border-slate-300 border px-3 py-2 focus:ring-2 focus:ring-brand-500"></textarea>
+        </div>
+
+        <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-3 rounded-xl transition-colors">
+          Generate Planning Budget
+        </button>
+      </form>
+    </section>
+
+    <!-- Plans Form (simpler) -->
+    <section id="plans-form" class="hidden space-y-6">
+      <button onclick="backToLanding()" class="text-sm text-brand-600 hover:text-brand-700 flex items-center gap-1">
+        ← Back
+      </button>
+      <h2 class="text-2xl font-bold text-slate-900">Plans / Drawings Path</h2>
+      <p class="text-slate-600">Upload or describe your drawings for a tighter planning range.</p>
+
+      <form id="plansForm" class="bg-white rounded-2xl border border-slate-200 p-6 space-y-6 shadow-sm" onsubmit="handlePlansSubmit(event)">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Project type</label>
+          <select id="plansRoomType" required class="w-full rounded-lg border-slate-300 border px-3 py-2">
+            <option value="kitchen">Kitchen remodel</option>
+            <option value="bathroom">Bathroom remodel</option>
+            <option value="addition">Addition / new construction</option>
+            <option value="whole_house">Whole-house renovation</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Total conditioned area (sq ft)</label>
+            <input type="number" id="plansSqft" min="50" required class="w-full rounded-lg border-slate-300 border px-3 py-2" placeholder="e.g. 2200" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Location</label>
+            <input type="text" id="plansLocation" required class="w-full rounded-lg border-slate-300 border px-3 py-2" placeholder="ZIP or City" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Finish level</label>
+          <select id="plansFinish" class="w-full rounded-lg border-slate-300 border px-3 py-2">
+            <option value="basic">Basic</option>
+            <option value="mid" selected>Mid-range</option>
+            <option value="luxury">Luxury</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Upload drawings (PDF / images) — mock only</label>
+          <input type="file" accept=".pdf,image/*" multiple class="w-full text-sm" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Scope notes</label>
+          <textarea id="plansNotes" rows="3" class="w-full rounded-lg border-slate-300 border px-3 py-2" placeholder="Key scope items, structural changes, etc."></textarea>
+        </div>
+        <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-3 rounded-xl">
+          Generate Planning Budget
+        </button>
+      </form>
+    </section>
+
+    <!-- Results -->
+    <section id="results" class="hidden space-y-8">
+      <button onclick="backToLanding()" class="text-sm text-brand-600 hover:text-brand-700 flex items-center gap-1">
+        ← Start over
+      </button>
+
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
+        <strong>Planning estimate only.</strong> These ranges are illustrative and based on national averages adjusted for region and finish level. They are not a formal quote. Hidden conditions, permits, design fees, and market volatility can change the final cost significantly. Always obtain multiple detailed bids from licensed contractors.
+      </div>
+
+      <div id="resultContent" class="space-y-6"></div>
+    </section>
+  </main>
+
+  <footer class="border-t border-slate-200 mt-16 py-8 text-center text-sm text-slate-500">
+    ScopeGuard Prototype · Built for homeowners · Not financial or construction advice
+  </footer>
+
+  <script src="data/costs.js"></script>
+  <script src="js/estimator.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
