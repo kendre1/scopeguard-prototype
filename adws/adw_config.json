@@ -1,0 +1,190 @@
+{
+  "project_name": "scopeguard-prototype",
+  "main_branch": "main",
+  "_comment_code_review_lens": "The convergence gate runs two review lenses each round: spec-conformance (/review) and code-level diff review (/review_code). The code lens is ON by default (the highest-leverage check for thinly-tested repos); set false to disable it (only the spec lens then gates). The spec lens is always on.",
+  "code_review_lens": true,
+  "_comment_commands": "The repo's REAL validation/run commands — the render seam (adw_modules/render_ops.py) injects these into the shared command-prompt templates at run time (DI-9; harness-runtime-injection.md), so prompts like test.md stop being hand-de-hardcoded per repo. Bootstrap fills these from repo analysis. test_sequence: the ordered validation pipeline (fastest first), each step {title, name (snake_case test_name), command, purpose} — exactly what test.md renders; EMPTY → the block renderer emits an explicit stub (never a wrong command). build/lint/format/run: optional scalar commands the other prompts draw on via inline holes; these are FAIL-LOUD — a prompt that references one while it is null will fail to render, so set the scalar before a prompt uses it. app_prep: the app lifecycle commands. Web (playwright-mcp): start = the FOREGROUND dev-server command (no nohup/&/redirects — the HARNESS Popens it, health-checks app.url, and PID-group-kills it after e2e; adw_modules/app_server.py); optional reset/stop are harness-run cleanup and MUST be self-match-safe — exact pkill -x -f '<full argv>' only, never a bare pkill -f (on Linux the exec wrapper's argv carries the command text and pkill -f kills its own calling shell). Electron (playwright-mcp + e2e.platform electron) uses the web fields: start = the foreground launch under a virtual display with the CDP port flag (e.g. xvfb-run -a npm start -- --remote-debugging-port=9315 --no-sandbox --disable-gpu; the container flags are REQUIRED in the hosted runner (no setuid sandbox / no GPU there); app.url = the CDP endpoint, health_path /json/version). Mobile fills build + install_artifact (the built .app/.apk path; device/app_id are reused from e2e.*), rendered into prepare_app_mobile.md (fail-loud holes).",
+  "commands": {
+    "test_sequence": [
+      {
+        "title": "JavaScript syntax check",
+        "name": "js_syntax",
+        "command": "node --check data/costs.js && node --check js/estimator.js && node --check js/app.js",
+        "purpose": "Parses every script the browser loads, in the same order index.html loads them. Catches syntax errors, stray characters, and unbalanced braces that would otherwise only surface as a blank page in the browser — this repo has no build step, so nothing else parses the source."
+      },
+      {
+        "title": "Unit tests",
+        "name": "unit_tests",
+        "command": "node --test \"tests/**/*.test.mjs\"",
+        "purpose": "Runs the dependency-free node:test suite over the estimator, the cost tables, and the markup-to-script contracts. Catches wrong estimate arithmetic, scope-factor double-counting, milestone percentages that no longer total 100, cost-table options offered in the UI with no data behind them, and renamed DOM ids or inline handlers that would silently produce a dead control."
+      }
+    ],
+    "build": null,
+    "lint": null,
+    "format": null,
+    "run": "python3 -m http.server 8000",
+    "app_prep": {
+      "reset": null,
+      "start": "python3 -m http.server 8000",
+      "stop": null,
+      "build": null,
+      "install_artifact": null
+    }
+  },
+  "paths": {
+    "agents_dir": "agents",
+    "specs_dir": "specs",
+    "patch_dir": "specs/patch",
+    "app_docs_dir": "app_docs"
+  },
+  "app": {
+    "url": "http://localhost:8000",
+    "health_path": "/",
+    "start_timeout_s": 30,
+    "has_ui": true
+  },
+  "models": {
+    "_comment": "Quality-first policy: default opus for everything; downgrade ONLY trivial mechanical tasks (branch-name slugs, literal workflow-name extraction) to sonnet; epic decomposition runs on the most capable model (claude-fable-5). Don't optimize AI compute cost before there's a reason to. NB: /epic pins the full Fable id — if the dispatch credential's account lacks Fable access, epic planning fails LOUDLY at the first agent call; the fallback is one config edit back to 'opus'.",
+    "default": "opus",
+    "overrides": {
+      "/epic": "claude-fable-5",
+      "/generate_branch_name": "sonnet",
+      "/classify_adw": "sonnet"
+    }
+  },
+  "retries": {
+    "_comment": "gate_rounds is the SINGLE combined budget for the convergence gate the executor drives: each round runs test + e2e + both review lenses (spec + code) as single detection passes and applies one surgical fix per blocking issue, up to this many rounds, then fails closed (NOT-READY PR + merge guard). test/e2e/review are kept for back-compat (the standalone adw_test loop + the per-pass detect cap) but no longer drive independent gate loops inside the executor.",
+    "gate_rounds": 4,
+    "test": 4,
+    "e2e": 2,
+    "review": 3
+  },
+  "e2e": {
+    "_comment": "driver: playwright-mcp (web, markdown tests; with platform electron the MCP ATTACHES to the harness-launched Electron app over CDP — mcp_config registers --cdp-endpoint matching app.url) or maestro (ios/android, Maestro YAML flows executed by maestro-runner — a single Go binary, no JVM; `curl -fsSL https://open.devicelab.dev/install/maestro-runner | bash`). The driver names the flow format, not the runtime. flows_dir null → per-driver default (.claude/commands/e2e or .maestro). device/app_id are mobile-only. mcp_config: repo-relative .mcp.json with the browser-automation MCP server for the playwright-mcp driver (passed to the e2e agents as --mcp-config; null → none). max_flows is the suite budget (loud gate, never silent accretion). run_tier: smoke (smoke + affected journeys) or full. capture_baseline: run the PRE-change e2e pass (default false — post-change e2e failures then gate as regressions, fail-closed). agent_timeout_s: hard wall-clock cap per /test_e2e agent call — a wedged journey reports failed instead of eating the run budget.",
+    "enabled": true,
+    "driver": "playwright-mcp",
+    "flows_dir": null,
+    "platform": "web",
+    "device": null,
+    "app_id": null,
+    "mcp_config": ".mcp.json",
+    "max_flows": 20,
+    "run_tier": "smoke",
+    "capture_baseline": false,
+    "agent_timeout_s": 900
+  },
+  "coverage": {
+    "_comment": "Deterministic coverage (Level 1): command is the repo's real coverage invocation writing report_path in format (lcov|cobertura|go), parsed by adw_modules/coverage_ops.py. All null → coverage step skipped. threshold is informational, non-blocking.",
+    "command": null,
+    "report_path": null,
+    "format": null,
+    "threshold": 0.0
+  },
+  "orchestrator": {
+    "_comment": "Build orchestrator (adw_modules/orchestrator.py): runs a plan WHOLE in one implement context and lands a single commit (the fast common case). Review is NOT run here — /review runs once at the feature-level gate, never per task. decompose_on_failure (default true): a FAILED whole attempt decomposes into the plan's Step by Step Tasks and commits one-per-task (per-task granularity for large changes); false → fail atomically. Capped at one decomposition level.",
+    "decompose_on_failure": true
+  },
+  "recursion": {
+    "_comment": "Explicit recursion caps for the compiled-workflow engine (recursion_ops.RecursionCaps + check_caps; 'bound depth and breadth explicitly'). max_decompose_depth (default 1): bounds the orchestrator's reactive decomposition — 1 = today's whole→one-level-of-per-task behavior, 0 = never decompose. max_gate_rounds null → defer to retries.gate_rounds; max_epic_breadth null → defer to epic.max_features (one knob per bound, no duplicate source of truth). The eval scorer verifies a finished run never exceeded these.",
+    "max_decompose_depth": 1,
+    "max_gate_rounds": null,
+    "max_epic_breadth": null
+  },
+  "evals": {
+    "_comment": "Planner/engine eval harness (adw_modules/eval_ops.py + adws/adw_eval.py). enabled is opt-in (the harness ships inert; running evals is an operator/CI action). eval_set: the committed set of representative issues (budget expectation + rubric each), scored deterministically over a finished run's metrics + the /eval_judge LLM verdict. min_pass_rate: the scorecard bar adw_eval exits non-zero on. judge_command: the LLM-as-judge slash command.",
+    "enabled": false,
+    "eval_set": "adws/evals/eval_set.json",
+    "min_pass_rate": 1.0,
+    "judge_command": "/eval_judge"
+  },
+  "epic": {
+    "_comment": "DAG-decomposed epic orchestrator (adw_modules/epic_orchestrator.py): /epic decomposes a lofty request into a DAG of features, walked serial-topologically on one branch (JIT /feature plan → whole-first build → per-feature gate of full /test + convergence e2e + /review). The per-feature gate reuses retries.test/e2e/review — no retry knobs here. All defaults are safe; bootstrap need not change them. max_features: loud decomposition budget (epic analogue of e2e.max_flows). feature_command: the per-node planning command. coverage_delta_gate: off by default (informational-coverage stance); when true AND coverage.command is set, a feature whose convergence lowers the measured line rate fails its gate.",
+    "coverage_delta_gate": false,
+    "max_features": 12,
+    "feature_command": "/feature"
+  },
+  "autonomy": {
+    "_comment": "Project autonomy policy SOURCE (the repo never stores the policy content). policy_source: a file path or http(s)/file URL the autonomy adapter reads the AutonomyPolicy from (null → no source → human-in-the-loop default; a future multi-tenant config service/UI populates it). sensitive_paths: globs whose touch hard-floors a change to human. auto_eligible_task_types: repo-level allowlist of task types eligible for auto-merge, intersected on top of the policy (score-free replacement for the retired numeric cap). Empty → nothing auto-merges even under an open policy.",
+    "policy_source": null,
+    "sensitive_paths": [
+      "**/.env*",
+      "**/secrets/**",
+      "**/*secret*",
+      "**/credentials*",
+      "infra/**",
+      ".github/workflows/**",
+      "**/migrations/**"
+    ],
+    "auto_eligible_task_types": []
+  },
+  "automerge": {
+    "_comment": "Master kill-switch for zero-touch merge. enabled=false (default) → ALWAYS human-in-the-loop: the merge stage never auto-merges regardless of the policy. Even when true, auto-merge still requires a loaded policy AND an auto-eligible task_type (in both the policy and autonomy.auto_eligible_task_types) AND no sensitive paths.",
+    "enabled": false
+  },
+  "github": {
+    "bot_identifier": "[ADW-BOT]",
+    "default_workflow": "adw_run"
+  },
+  "triggers": {
+    "_comment": "sync_before_run: hard-sync the clone to origin/<main_branch> before each dispatched run (persistent-clone hosts like a VPS container; force-push safe). Webhook deliveries are HMAC-verified when the ADW_WEBHOOK_SECRET env var is set.",
+    "webhook_port": 8001,
+    "cron_poll_seconds": 60,
+    "sync_before_run": false
+  },
+  "artifacts": {
+    "backend": "none",
+    "s3": {
+      "endpoint_url_env": "ADW_S3_ENDPOINT_URL",
+      "access_key_id_env": "ADW_S3_ACCESS_KEY_ID",
+      "secret_access_key_env": "ADW_S3_SECRET_ACCESS_KEY",
+      "bucket_env": "ADW_S3_BUCKET",
+      "public_base_url_env": "ADW_S3_PUBLIC_BASE_URL"
+    },
+    "github_branch": {
+      "branch": "adw-artifacts"
+    }
+  },
+  "tracing": {
+    "_comment": "Swappable agent-tracing seam. The harness already captures the full stream-json transcript per agent; tracing parses it into a trace tree and, when backend is 'langfuse', emits it as a Langfuse session (root span per agent, generations per turn with model+usage, tool spans with I/O, run-level cost, tenant as user_id). backend 'langfuse' is the DEFAULT — athema-operated repos are traced (the hosted control plane injects the creds + tenant id per run via capabilities.tracing), and the emitter is best-effort: with no creds in the env it degrades to a no-op, so a standalone repo behaves exactly like backend 'none'. The transcript stays the source of truth; Langfuse is a derived view. Set backend 'none' to hard-disable. Per-tenant attribution: tenant_id_env (runtime injection) → tenant_id (literal) → project_name. Secrets are NEVER stored here — only the env-var NAMES holding the Langfuse credentials (same posture as artifacts.s3). The SDK is runtime-injected at launch (uv run --with langfuse via utils.uv_run_cmd) only when backend is 'langfuse' — never committed to the harness deps — and the harness then auto-allowlists the named credential env vars + tenant_id_env to the run.",
+    "backend": "langfuse",
+    "tenant_id": null,
+    "tenant_id_env": "ADW_TENANT_ID",
+    "langfuse": {
+      "public_key_env": "LANGFUSE_PUBLIC_KEY",
+      "secret_key_env": "LANGFUSE_SECRET_KEY",
+      "host_env": "LANGFUSE_HOST"
+    },
+    "_comment_context_windows": "Optional model→context-window override map (prefix-keyed, e.g. {\"my-model\": 128000}) for the context-utilization metric (per-turn + peak occupancy, emitted to Langfuse + gated by the eval max_context_pct budget). Empty by default — tracing.MODEL_CONTEXT_WINDOWS already knows the current models (Opus 5/4.6-4.8, Sonnet 5/4.6, Fable 5 are natively 1M; Haiku 4.5 is 200k), plus an occupancy backstop for anything unlisted. Only set this to correct/override a window without a code change.",
+    "context_windows": {}
+  },
+  "observability": {
+    "_comment": "FORWARD-LOOKING, default off (same posture as tracing). Injected production-observability seam: athema injects telemetry substrate (errors + release/deploy markers + redaction) into the TARGET APP at onboarding, closing the post-merge outer loop the pre-merge gate can't see (self-improvement-layer.md §5). The per-stack payload is the vendored shim bootstrap installs from templates/observability/ (self-gated on its endpoint env — wiring ships inert until athema supplies values); this block is the repo-resident seam the audit/platform read — the harness wires nothing, and the store + Signal Bus consuming the shim's events are control-plane-side (otel-production-loop-epic.md). enabled: opt-in. signals: errors + release markers (MVP; perf fast-follow). redaction: aggressive (strip PII at source, keep opaque correlators) or standard. otel: env-var NAMES for the OTLP exporter (values out-of-band; secrets never stored here). tenant_id_env: explicit attribution (no silent project_name fallback for the telemetry tier).",
+    "enabled": false,
+    "signals": [
+      "errors",
+      "release_markers"
+    ],
+    "redaction": "aggressive",
+    "otel": {
+      "endpoint_env": "OTEL_EXPORTER_OTLP_ENDPOINT",
+      "headers_env": "OTEL_EXPORTER_OTLP_HEADERS"
+    },
+    "tenant_id_env": "ADW_TENANT_ID"
+  },
+  "feedback_mining": {
+    "_comment": "FORWARD-LOOKING, default off. Feedback-mining agent seam: the /feedback_mine command (an in-repo ADAPTIVE prompt, L1-adaptable) scours owner-seeded venues for what real users say, clusters by theme, and emits a typed cluster Report a future dashboard surfaces with 'Fix this' / 'Rate this cluster' (self-improvement-layer.md §11). The platform operates scheduling, internet egress, and the dashboard that DRIVE it (feedback-mining-control-plane-connectors.md) — NOT wired by the harness. NOT an issue-routed adw workflow (operator/platform-driven, like adw_eval). enabled: the command ships installed-but-inert. cadence: informational cron hint (the platform's scheduler drives it; ~2x/week). venues: owner-seeded sanctioned sources (auto-discovery is post-MVP). min_cluster_size: a cluster surfaces only at/above this item count.",
+    "enabled": false,
+    "cadence": "0 9 * * 1,4",
+    "venues": {
+      "listing_urls": [],
+      "subreddits": [],
+      "handles": [],
+      "review_sites": []
+    },
+    "min_cluster_size": 3
+  },
+  "_comment_env_allowlist_extra": "Extra env vars the harness forwards into the agent subprocess (it filters everything else). CLAUDE_CODE_OAUTH_TOKEN ships by default because athema's hosted runs authenticate with a subscription token injected as that var (capabilities.llm.auth_env) — remove it and every hosted agent call starts credential-less (apiKeySource: none) and fails. Harmless when unset (a plain env-var name, never a secret). Add ANTHROPIC_BASE_URL here if a run must reach an LLM proxy.",
+  "env_allowlist_extra": [
+    "CLAUDE_CODE_OAUTH_TOKEN"
+  ]
+}

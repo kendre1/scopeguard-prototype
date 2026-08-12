@@ -1,0 +1,17 @@
+{
+  "_comment": "E2E journey registry — the curation seam against suite sprawl. Every flow file in this directory must be registered to a journey (extend an existing journey's flow before adding a new one). `covers` lists source areas (prefixes or globs) the journey exercises — used to select affected journeys per run. `tier`: smoke journeys run every test phase; full journeys run on --e2e-full.",
+  "journeys": [
+    {
+      "id": "photos-path-estimate",
+      "covers": ["index.html", "js/app.js", "js/estimator.js", "data/costs.js"],
+      "flows": ["photos_path_estimate.md"],
+      "tier": "smoke"
+    },
+    {
+      "id": "plans-path-estimate",
+      "covers": ["index.html", "js/app.js", "js/estimator.js", "data/costs.js"],
+      "flows": ["plans_path_estimate.md"],
+      "tier": "full"
+    }
+  ]
+}
