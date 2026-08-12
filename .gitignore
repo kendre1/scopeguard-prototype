@@ -6,3 +6,17 @@ node_modules/
 dist/
 .env
 .env.local
+
+# Agentic run scratch (ADW harness): state, transcripts, screenshots, logs.
+# Anchored — an unanchored `agents/` would also swallow `.claude/agents/`.
+/agents/
+
+# Playwright MCP server run scratch (console logs, page snapshots)
+/.playwright-mcp/
+
+# Local-only Claude Code overrides (the rest of .claude/ is team infrastructure)
+.claude/settings.local.json
+
+# Python bytecode from the ADW harness
+__pycache__/
+*.pyc
